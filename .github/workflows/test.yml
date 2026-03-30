@@ -1,6 +1,6 @@
 name: API Automation Tests
 # on：触发条件
-on:
+on:                                                         
   push:
     branches: #代码推送到main或者develop分支时触发
       - main
