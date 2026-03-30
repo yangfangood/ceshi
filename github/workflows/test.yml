@@ -1,0 +1,90 @@
+name: API Automation Tests
+# on：触发条件
+on:
+  push:
+    branches: #代码推送到main或者develop分支时触发
+      - main
+      - develop
+# 有 PR 请求合并到 main 时触发
+  pull_request:
+    branches:
+      - main
+
+#ubuntu-latest: Ubuntu 最新版（免费）
+#windows-latest: Windows 最新版
+#macos-latest: macOS 最新版
+jobs:
+  test:
+    runs-on: ubuntu-latest
+# 测试矩阵：同时在 Python 3.10 和 3.11 上运行测试，确保兼容性。
+    strategy:
+      matrix:
+        python-version: ['3.10', '3.11']
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: 123456
+          MYSQL_DATABASE: petstore
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=3
+
+
+
+    # 每个 steps 是一个执行单元
+    steps:
+      # 1. 检出代码
+      - name: Checkout code
+        uses: actions/checkout@v4
+      # 2. 设置 python
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+
+      - name: Cache pip packages
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+      
+
+      # 3. 安装依赖
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Wait for MySQL
+        run: sleep 15
+
+      # 4. 运行测试
+      - name: Run tests
+        env:
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_USER: root
+          DB_PASSWORD: 123456
+          DB_NAME: petstore
+          run: |
+            pytest testcases/ -v --tb=short
+
+      # 5. 上传测试报告（Allure 数据）
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-results-${{ matrix.python-version }}
+          path: allure-results
+        if: always()
+
+      # 6. 发送通知（可选）
+      - name: Send notification
+        run: |
+          echo "测试完成！"
+        if: always()
+
